@@ -55,7 +55,57 @@ exts = {
 USERS = {
     "eder": "abc",
     "allan": "def",
-    "test": "test"
+    "test": "test",
+"host102user": "host102pass",
+"host103user": "host103pass",
+"host104user": "host104pass",
+"host105user": "host105pass",
+"host106user": "host106pass",
+"host107user": "host107pass",
+"host108user": "host108pass",
+"host109user": "host109pass",
+"host110user": "host110pass",
+"host111user": "host111pass",
+"host112user": "host112pass",
+"host113user": "host113pass",
+"host114user": "host114pass",
+"host115user": "host115pass",
+"host116user": "host116pass",
+"host117user": "host117pass",
+"host118user": "host118pass",
+"host119user": "host119pass",
+"host120user": "host120pass",
+"host121user": "host121pass",
+"host122user": "host122pass",
+"host123user": "host123pass",
+"host124user": "host124pass",
+"host125user": "host125pass",
+"host126user": "host126pass",
+"host127user": "host127pass",
+"host128user": "host128pass",
+"host129user": "host129pass",
+"host130user": "host130pass",
+"host131user": "host131pass",
+"host132user": "host132pass",
+"host133user": "host133pass",
+"host134user": "host134pass",
+"host135user": "host135pass",
+"host136user": "host136pass",
+"host137user": "host137pass",
+"host138user": "host138pass",
+"host139user": "host139pass",
+"host140user": "host140pass",
+"host141user": "host141pass",
+"host142user": "host142pass",
+"host143user": "host143pass",
+"host144user": "host144pass",
+"host145user": "host145pass",
+"host146user": "host146pass",
+"host147user": "host147pass",
+"host148user": "host148pass",
+"host149user": "host149pass",
+"host150user": "host150pass"
+
 }
 
 
@@ -83,10 +133,13 @@ def get_client_address(environ):
         return environ['REMOTE_ADDR']
 
 
-def send_auth_request(ip):
+def send_auth_request(ip, user):
     server = "{:s}:{:s}".format(CTL_REST_IP, CTL_REST_PORT)
-    url = "http://{:s}/v1.0/authenticate/{:s}".format(server, ip)
+    #todo send user
+    print server
+    url = "http://{:s}/v1.0/authenticate/ip={:s}&user={:s}".format(server, ip, user)
 
+    print url
     params = urllib.urlencode({})
     response = urllib2.urlopen(url, params).read()
     print response
@@ -132,7 +185,9 @@ def application(env, start_response):
                 "Redirecting to <a href='%(url)s'>%(url)s</a> in 10 seconds. "
                 "<meta http-equiv='refresh' content='10;%(url)s'>"
                 ) % {'url': escape(redirect_target)}
-            send_auth_request(get_client_address(env))
+            print "about to add flows to controller"
+            send_auth_request(get_client_address(env), username)
+            print "added flows to controller (or failed). the method returned"
             return reply(start_response, "200 OK", HTML, text)
     elif path == "login":
         request = parse_qs(env["QUERY_STRING"])
