@@ -145,6 +145,19 @@ def send_auth_request(ip, user):
     print response
 
 
+def send_deauth(ip):
+    server = "{:s}:{:s}".format(CTL_REST_IP, CTL_REST_PORT)
+    user = "NULL"
+    url = "http://{:s}/v1.0/authenticate/ip={:s}&user={:s}".format(server, ip, user)
+
+    opener = urllib2.build_opener(urllib2.HTTPHandler)
+    request = urllib2.Request(url)
+    request.add_header('Content-Type', 'application/x-www-form-urlencoded')
+    request.get_method = lambda: 'DELETE'
+    url = opener.open(request)
+
+
+
 def application(env, start_response):
     #print env
     old_path = env["PATH_INFO"]
@@ -194,6 +207,16 @@ def application(env, start_response):
         content = open("login.html", "r").read()
         content = content % {"redirect": request['redirect'][0]}
         return reply(start_response, "200 OK", HTML, content)
+    elif path == "logout" or path == "logoff":
+        content = open("logout.html", "r").read()
+        return reply(start_response, "200 OK", HTML, content)
+    elif path == "loggedout":
+        content = open("goodbye.html", "r").read()
+        # send logout message to controller here
+	ip = get_client_address(env)
+	print "logging of user on IP: " + ip
+	send_deauth(ip)
+	return reply(start_response, "200 OK", HTML, content)
     else:
         # Return file
         path = os.path.join(os.getcwd(), path + env["PATH_INFO"])
