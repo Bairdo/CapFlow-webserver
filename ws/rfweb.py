@@ -19,7 +19,11 @@ import urllib2
 import sys
 sys.path.append("../")
 
-from config import CTL_REST_IP, CTL_REST_PORT
+from pyrad.client import Client
+from pyrad.dictionary import Dictionary
+import pyrad.packet
+
+from config import CTL_REST_IP, CTL_REST_PORT, RADIUS_SERVER_ADDRESS, RADIUS_SECRET
 
 PLAIN = 0
 HTML = 1
@@ -50,62 +54,6 @@ exts = {
 ".jpg": JPEG,
 ".jpeg": JPEG,
 ".json": JSON,
-}
-
-USERS = {
-    "eder": "abc",
-    "allan": "def",
-    "test": "test",
-"host102user": "host102pass",
-"host103user": "host103pass",
-"host104user": "host104pass",
-"host105user": "host105pass",
-"host106user": "host106pass",
-"host107user": "host107pass",
-"host108user": "host108pass",
-"host109user": "host109pass",
-"host110user": "host110pass",
-"host111user": "host111pass",
-"host112user": "host112pass",
-"host113user": "host113pass",
-"host114user": "host114pass",
-"host115user": "host115pass",
-"host116user": "host116pass",
-"host117user": "host117pass",
-"host118user": "host118pass",
-"host119user": "host119pass",
-"host120user": "host120pass",
-"host121user": "host121pass",
-"host122user": "host122pass",
-"host123user": "host123pass",
-"host124user": "host124pass",
-"host125user": "host125pass",
-"host126user": "host126pass",
-"host127user": "host127pass",
-"host128user": "host128pass",
-"host129user": "host129pass",
-"host130user": "host130pass",
-"host131user": "host131pass",
-"host132user": "host132pass",
-"host133user": "host133pass",
-"host134user": "host134pass",
-"host135user": "host135pass",
-"host136user": "host136pass",
-"host137user": "host137pass",
-"host138user": "host138pass",
-"host139user": "host139pass",
-"host140user": "host140pass",
-"host141user": "host141pass",
-"host142user": "host142pass",
-"host143user": "host143pass",
-"host144user": "host144pass",
-"host145user": "host145pass",
-"host146user": "host146pass",
-"host147user": "host147pass",
-"host148user": "host148pass",
-"host149user": "host149pass",
-"host150user": "host150pass"
-
 }
 
 
@@ -174,7 +122,7 @@ def application(env, start_response):
 
     print "path:'%s'" % path
     if path == "auth":
-        if "CONTENT_LENGTH" in env:
+       if "CONTENT_LENGTH" in env:
             try:
                 len_ = int(env["CONTENT_LENGTH"])
                 body = env['wsgi.input'].read(len_)
@@ -187,21 +135,43 @@ def application(env, start_response):
                 username = request["username"][0]
                 password = request["password"][0]
                 redirect_target = request["redirect"][0]
+
+                srv = Client(server=RADIUS_SERVER_ADDRESS, secret=RADIUS_SECRET, dict=Dictionary("dictionary"))
+
+                req = srv.CreateAuthPacket(code=pyrad.packet.AccessRequest,
+                                           User_Name=username, NAS_Identifier="localhost")
+                req["User-Password"] = req.PwCrypt(password)
+                
+                repl = srv.SendPacket(req)
+                if repl.code == pyrad.packet.AccessAccept:
+                    print "about to add flows to controller"
+                    send_auth_request(get_client_address(env), username)
+                    print "added flows to controller (or failed). the method returned"
+
+                    print("access accepted")
+                    text = (
+                            "Authenticated. "
+                            "Redirecting to <a href='%(url)s'>%(url)s</a> in 10 seconds. "
+                            "<meta http-equiv='refresh' content='10;%(url)s'>"
+                            ) % {'url': escape(redirect_target)}
+                    return reply(start_response, "200 OK", HTML, text)
+
+                else:
+                    print("access denied")
+                    request = parse_qs(env["QUERY_STRING"])
+                    content = open("login.html", "r").read()
+                    content = content % {"redirect": request['redirect'][0]}
+                    return reply(start_response, "400 Bad Request", HTML, content) 
+               
+                if repl.keys() != []:
+                    for i in repl.keys():
+                        print("%s: %s" % (i, repl[i]))
+                else:
+                    print "nothing returned by radius"
             except KeyError, IndexError:
                 return reply(start_response, "400 Bad Request",
                              "Missing login information.")
-            if username not in USERS or USERS[username] != password:
-                return reply(start_response, "401 Unauthorized", PLAIN,
-                             "Unauthorized access.")
-            text = (
-                "Authenticated. "
-                "Redirecting to <a href='%(url)s'>%(url)s</a> in 10 seconds. "
-                "<meta http-equiv='refresh' content='10;%(url)s'>"
-                ) % {'url': escape(redirect_target)}
-            print "about to add flows to controller"
-            send_auth_request(get_client_address(env), username)
-            print "added flows to controller (or failed). the method returned"
-            return reply(start_response, "200 OK", HTML, text)
+
     elif path == "login":
         request = parse_qs(env["QUERY_STRING"])
         content = open("login.html", "r").read()
@@ -213,10 +183,10 @@ def application(env, start_response):
     elif path == "loggedout":
         content = open("goodbye.html", "r").read()
         # send logout message to controller here
-	ip = get_client_address(env)
-	print "logging of user on IP: " + ip
-	send_deauth(ip)
-	return reply(start_response, "200 OK", HTML, content)
+    	ip = get_client_address(env)
+        print "logging of user on IP: " + ip
+    	send_deauth(ip)
+    	return reply(start_response, "200 OK", HTML, content)
     else:
         # Return file
         path = os.path.join(os.getcwd(), path + env["PATH_INFO"])
